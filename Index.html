@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MediScan AI | Health Advisor</title>
+    <style>
+        /* Smooth Purple & Blue Theme on White */
+        :root {
+            --primary: #6f42c1; /* Deep Purple */
+            --secondary: #007bff; /* Medical Blue */
+            --text: #333;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #ffffff; margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; color: var(--text); }
+
+        /* 1. STARTUP PAGE */
+        #startup-page { 
+            position: fixed; width: 100%; height: 100%; 
+            background: linear-gradient(135deg, var(--primary), var(--secondary)); 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+            color: white; z-index: 1000; transition: 1s ease-in-out; 
+        }
+        .logo-icon { font-size: 80px; margin-bottom: 10px; filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2)); }
+        .start-btn { 
+            margin-top: 40px; background: white; color: var(--primary); border: none; 
+            padding: 18px 50px; font-size: 20px; font-weight: bold; border-radius: 50px; 
+            cursor: pointer; box-shadow: 0 10px 25px rgba(0,0,0,0.2); transition: 0.3s; 
+        }
+        .start-btn:hover { transform: scale(1.05); box-shadow: 0 15px 30px rgba(0,0,0,0.3); }
+
+        /* 2. MAIN APP LAYOUT */
+        #main-app { display: none; width: 95%; max-width: 1000px; animation: fadeIn 1.5s; }
+        .app-layout { display: grid; grid-template-columns: 1.2fr 1fr; gap: 30px; }
+        
+        .card { background: #fff; padding: 30px; border-radius: 25px; box-shadow: 0 20px 50px rgba(0,0,0,0.05); border: 1px solid #f0f0f0; position: relative; overflow: hidden; }
+        .card::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 6px; background: linear-gradient(to right, var(--primary), var(--secondary)); }
+
+        #webcam-container { width: 100%; border-radius: 15px; overflow: hidden; background: #000; border: 4px solid #f8f9fa; }
+        
+        /* 3. SOLUTION LOGIC STYLES */
+        #advice-box { background: #fdfdff; padding: 25px; border-radius: 20px; border: 1px dashed #d1d1d1; min-height: 320px; text-align: left; }
+        .problem-title { font-size: 22px; font-weight: bold; margin-bottom: 15px; display: block; }
+        .solution-step { margin-bottom: 10px; padding-left: 10px; border-left: 3px solid var(--secondary); line-height: 1.5; color: #555; }
+        .disclaimer { font-size: 11px; color: #aaa; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <!-- SCREEN 1: STARTUP -->
+    <div id="startup-page">
+        <div class="logo-icon">🧬</div>
+        <h1>MEDISCAN AI</h1>
+        <p>Symptom Analysis & Solution Portal</p>
+        <button class="start-btn" onclick="launchScanner()">START ANALYSIS</button>
+    </div>
+
+    <!-- SCREEN 2: MAIN SCANNER -->
+    <div id="main-app">
+        <div class="app-layout">
+            
+            <!-- LEFT: CAMERA -->
+            <div class="card">
+                <h2 style="color: var(--primary); margin-top:0;">Live Scanner</h2>
+                <div id="webcam-container"></div>
+                <div id="probability-labels" style="margin-top:20px; font-size: 14px; color: #888;"></div>
+            </div>
+
+            <!-- RIGHT: LOGIC (PROBLEM & SOLUTION) -->
+            <div class="card">
+                <h2 style="color: var(--secondary); margin-top:0;">AI Recommendation</h2>
+                <div id="advice-box">
+                    <div id="waiting-msg" style="text-align:center; padding-top:100px; color:#bbb;">
+                        <div style="font-size:40px;">🔍</div>
+                        <p>Scanning for symptoms...</p>
+                    </div>
+                    
+                    <div id="result-display" style="display:none;">
+                        <span id="p-label" class="problem-title"></span>
+                        <div id="s-list"></div>
+                        <div class="disclaimer">
+                            <strong>NOTICE:</strong> This is a school prototype. Advice is pre-programmed 
+                            and not a clinical diagnosis. Always consult a healthcare professional.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
+
+    <script>
+        // YOUR UNIQUE MODEL LINK
+        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/Mra924aIl/"; 
+
+        let model, webcam, maxPredictions;
+
+        async function launchScanner() {
+            const startup = document.getElementById("startup-page");
+            startup.style.opacity = "0";
+            setTimeout(async () => {
+                startup.style.display = "none";
+                document.getElementById("main-app").style.display = "block";
+                await initAI();
+            }, 800);
+        }
+
+        async function initAI() {
+            try {
+                model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+                maxPredictions = model.getTotalClasses();
+                
+                webcam = new tmImage.Webcam(400, 400, true); 
+                await webcam.setup(); 
+                await webcam.play();
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                window.requestAnimationFrame(loop);
+            } catch (err) {
+                alert("AI Error: Check internet connection and camera permissions.");
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let topClass = "";
+            let topProb = 0;
+            let labelHTML = "";
+
+            for (let i = 0; i < maxPredictions; i++) {
+                labelHTML += `${prediction[i].className}: ${(prediction[i].probability * 100).toFixed(0)}% | `;
+                if (prediction[i].probability > topProb) {
+                    topProb = prediction[i].probability;
+                    topClass = prediction[i].className;
+                }
+            }
+            document.getElementById("probability-labels").innerHTML = labelHTML;
+
+            // --- PROBLEM & SOLUTION LOGIC ---
+            const waiting = document.getElementById("waiting-msg");
+            const result = document.getElementById("result-display");
+            const pLabel = document.getElementById("p-label");
+            const sList = document.getElementById("s-list");
+
+            if (topProb > 0.85) { // Show solutions only if 85% confident
+                waiting.style.display = "none";
+                result.style.display = "block";
+
+                if (topClass === "Healthy") {
+                    pLabel.innerHTML = "✅ Result: Healthy";
+                    pLabel.style.color = "#28a745";
+                    sList.innerHTML = `
+                        <div class="solution-step">The AI detects no visible symptoms.</div>
+                        <div class="solution-step">Maintain good hygiene and hydration.</div>
+                        <div class="solution-step">Keep monitoring the area for changes.</div>
+                    `;
+                } else {
+                    // This handles any symptom you trained
+                    pLabel.innerHTML = "⚠️ Symptom: " + topClass;
+                    pLabel.style.color = "#dc3545";
+                    sList.innerHTML = `
+                        <div class="solution-step"><strong>Problem:</strong> AI identified patterns consistent with ${topClass}.</div>
+                        <div class="solution-step"><strong>Action:</strong> Keep the area clean and avoid scratching.</div>
+                        <div class="solution-step"><strong>Action:</strong> Use mild, unscented moisturizers if applicable.</div>
+                        <div class="solution-step"><strong>Urgent:</strong> Seek a professional medical diagnosis from a doctor.</div>
+                    `;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
