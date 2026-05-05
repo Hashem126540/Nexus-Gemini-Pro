@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraScan Gemini | Clinical Titan Edition</title>
+    
+    <link href="https://googleapis.com" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #020204;
+            --gemini-gradient: linear-gradient(135deg, #4285f4, #9b72cb, #d96a70, #f8fafc);
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-strong: rgba(255, 255, 255, 0.08);
+            --accent: #d97757; 
+            --border-glow: rgba(155, 114, 203, 0.3);
+            --text-dim: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: var(--bg); color: #fff; height: 100vh; overflow: hidden; }
+
+        /* --- 1. THE MORPHING SPLASH --- */
+        #splash {
+            position: fixed; inset: 0; background: var(--bg); z-index: 10000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .morph-logo {
+            width: 120px; height: 120px; background: var(--gemini-gradient);
+            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            animation: morph 8s ease-in-out infinite; box-shadow: 0 0 50px var(--border-glow);
+        }
+        @keyframes morph {
+            0%, 100% { border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%; }
+            50% { border-radius: 70% 30% 30% 70% / 70% 70% 30% 30%; }
+        }
+
+        /* --- 2. THE PRO LAYOUT --- */
+        #main-app { display: none; height: 100vh; padding: 25px; grid-template-rows: auto 1fr; gap: 20px; animation: fadeIn 2s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-strong); padding-bottom: 15px; }
+        .brand { background: var(--gemini-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; font-size: 1.8rem; }
+
+        .app-grid { display: grid; grid-template-columns: 300px 1fr 450px; gap: 25px; height: calc(100vh - 120px); }
+
+        /* Fancy Sidebar */
+        .sidebar { display: flex; flex-direction: column; gap: 12px; }
+        .nav-btn { 
+            background: var(--glass); border: 1px solid var(--glass-strong); color: white;
+            padding: 20px; border-radius: 22px; text-align: left; cursor: pointer; transition: 0.4s;
+            font-weight: 600; position: relative; overflow: hidden;
+        }
+        .nav-btn:hover { background: var(--glass-strong); border-color: #4285f4; transform: translateX(5px); }
+        .nav-btn::after { content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 4px; background: var(--gemini-gradient); opacity: 0; transition: 0.3s; }
+        .nav-btn:hover::after { opacity: 1; }
+
+        /* Scanner Frame with Fancy Border */
+        .scanner-card { 
+            background: #000; border-radius: 45px; position: relative; 
+            overflow: hidden; border: 2px solid var(--glass-strong);
+            box-shadow: 0 0 40px rgba(0,0,0,1);
+        }
+        #webcam-container canvas { width: 100% !important; height: 100% !important; object-fit: cover; }
+        
+        .scan-beam {
+            position: absolute; inset: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, transparent, rgba(155, 114, 203, 0.15), transparent);
+            animation: scan 3.5s infinite ease-in-out; pointer-events: none;
+        }
+        @keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+
+        /* Intelligence/Voice Panel */
+        .intel-panel { 
+            background: var(--glass); backdrop-filter: blur(60px);
+            border-radius: 45px; border: 1px solid var(--glass-strong); padding: 40px;
+            display: flex; flex-direction: column; box-shadow: inset 0 0 20px rgba(255,255,255,0.02);
+        }
+        
+        .chat-area { flex-grow: 1; overflow-y: auto; margin: 25px 0; padding-right: 10px; }
+        .chat-area::-webkit-scrollbar { width: 4px; }
+        .chat-area::-webkit-scrollbar-thumb { background: var(--glass-strong); border-radius: 10px; }
+
+        .voice-ring {
+            width: 70px; height: 70px; border-radius: 50%; background: var(--gemini-gradient);
+            margin: 0 auto 10px; filter: blur(12px); opacity: 0.3; transition: 0.5s;
+        }
+        .voice-ring.active { animation: pulseVoice 1.2s infinite alternate; opacity: 0.9; filter: blur(6px); }
+        @keyframes pulseVoice { from { transform: scale(1); box-shadow: 0 0 20px var(--border-glow); } to { transform: scale(1.4); box-shadow: 0 0 60px var(--border-glow); } }
+
+        .advice-item { 
+            background: rgba(255,255,255,0.02); border: 1px solid var(--glass-strong);
+            padding: 20px; border-radius: 20px; margin-bottom: 15px;
+            animation: slideUp 0.6s ease forwards;
+        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .btn-talk {
+            background: var(--gemini-gradient); color: white; border: none;
+            padding: 22px; border-radius: 25px; font-weight: 800; cursor: pointer;
+            box-shadow: 0 15px 35px rgba(155, 114, 203, 0.4); transition: 0.3s;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        .btn-talk:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+
+    <div id="splash">
+        <div class="morph-logo"></div>
+        <h1 style="margin-top: 40px; letter-spacing: 5px; font-weight: 800;">AURASCAN <span style="font-weight: 200;">TITAN</span></h1>
+        <p style="color: var(--text-dim); margin-top: 15px; letter-spacing: 2px;">NEURAL ARCHITECTURE LOADING...</p>
+    </div>
+
+    <div id="main-app">
+        <header class="header">
+            <div class="brand">Nexus Gemini Pro</div>
+            <div style="font-size: 0.7rem; color: var(--text-dim); border: 1px solid var(--glass-strong); padding: 5px 15px; border-radius: 50px;">
+                STABLE BUILD v8.4.1 | FULL DIAGNOSTIC ACCESS
+            </div>
+        </header>
+
+        <div class="app-grid">
+            <aside class="sidebar">
+                <button class="nav-btn">📊 Full Scan History</button>
+                <button class="nav-btn">🧬 Biometric Comparison</button>
+                <button class="nav-btn">🩺 Clinical Guidelines</button>
+                <button class="nav-btn">📡 Remote Consultation</button>
+                <button class="nav-btn">⚙️ System Settings</button>
+                <div style="margin-top:auto; padding: 25px; background: var(--glass); border-radius: 30px; border: 1px dashed var(--accent);">
+                    <h5 style="color: var(--accent); margin-bottom: 10px;">TITAN LOG:</h5>
+                    <p style="font-size: 0.75rem; color: var(--text-dim); line-height: 1.5;">The AI is currently analyzing 4,000+ data points per frame. Voice recognition is calibrated for medical-only queries.</p>
+                </div>
+            </aside>
+
+            <main class="scanner-card">
+                <div class="scan-beam"></div>
+                <div id="webcam-container"></div>
+            </main>
+
+            <aside class="intel-panel">
+                <div class="voice-ring" id="v-ring"></div>
+                <h3 style="text-align:center; letter-spacing: 1px;">GEMINI VOICE CORE</h3>
+                <p id="ai-status" style="text-align:center; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 10px;">System Online</p>
+
+                <div class="chat-area" id="chat-log">
+                    <div class="advice-item" style="text-align:center; border:none; background:none;">
+                        <p style="color:var(--text-dim);">Ask me: "Tell me about my face scan" or "Give me medical advice."</p>
+                    </div>
+                </div>
+
+                <button class="btn-talk" onclick="startVoice()">Initiate Conversation</button>
+            </aside>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://unpkg.com/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script>
+        // 1. HUGE ADVICE DATABASE
+        const medIntelligence = {
+            const medIntelligence = {
+    "Healthy Face": {
+        speech: "Your biometric scan is clear. I detect no immediate health concerns.",
+        list: [
+            "<b>Hydration:</b> Maintain a daily intake of 2.5 liters of water.",
+            "<b>Protection:</b> Apply broad-spectrum SPF 50 daily, even indoors.",
+            "<b>Maintenance:</b> Continue with your current pH-balanced cleanser.",
+            "<b>Prevention:</b> Ensure 7-9 hours of restorative sleep."
+        ]
+    },
+    "Unhealthy Face": {
+        speech: "Warning: Biometric markers consistent with skin irritation or acne detected.",
+        list: [
+            "<b>Cleansing:</b> Use a gentle wash to clear debris without irritation.",
+            "<b>Protection:</b> Avoid touching or picking at inflamed areas.",
+            "<b>Action:</b> Identify new laundry soaps or detergents that may be a cause.",
+            "<b>Medical:</b> If symptoms persist, seek a clinical exam."
+        ]
+    }
+};
+
+        // 2. GEMINI BOY VOICE
+        const synth = window.speechSynthesis;
+        function speak(text) {
+            synth.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = synth.getVoices();
+            utterance.voice = voices.find(v => v.name.includes("Male") || v.name.includes("Google US English")) || voices[0];
+            utterance.pitch = 0.8; // Deep professional tone
+            utterance.rate = 0.9;
+            synth.speak(utterance);
+        }
+
+        // 3. VOICE RECOGNITION & CONVERSATION
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+
+        function startVoice() {
+            recognition.start();
+            document.getElementById('v-ring').classList.add('active');
+            document.getElementById('ai-status').innerText = "GEMINI IS LISTENING...";
+        }
+
+        recognition.onresult = (e) => {
+            const transcript = e.results[0][0].transcript.toLowerCase();
+            document.getElementById('v-ring').classList.remove('active');
+            document.getElementById('ai-status').innerText = "PROCESSING DATA...";
+            
+            updateUI("You", transcript);
+
+            const medicalKeywords = ["face", "skin", "medical", "health", "scan", "help", "acne", "rash", "diagnosis"];
+            const isMedical = medicalKeywords.some(word => transcript.includes(word));
+
+            if (!isMedical) {
+                const errorMsg = "I am sorry, but I am not able to respond to that. My neural protocols are strictly limited to medical facial analysis.";
+                speak(errorMsg);
+                updateUI("Gemini", errorMsg);
+            } else {
+                const data = medIntelligence[currentPrediction] || { speech: "Scanning...", list: ["Hold still for analysis."] };
+                speak("Analyzing your biometric feed. " + data.speech);
+                updateUI("Gemini", data.speech, data.list);
+            }
+        };
+
+        function updateUI(user, msg, list = []) {
+            const chat = document.getElementById('chat-log');
+            let listHtml = list.map(item => `<div style="font-size:0.85rem; margin-top:8px; border-left: 2px solid var(--accent); padding-left:10px;">${item}</div>`).join('');
+            
+            chat.innerHTML = `<div class="advice-item">
+                <b style="color:var(--accent)">${user.toUpperCase()}:</b><br>
+                <span style="font-size:0.95rem;">${msg}</span>
+                ${listHtml}
+            </div>` + chat.innerHTML;
+        }
+
+        // 4. THE TITAN SCANNER ENGINE
+        const URL = "https://teachablemachine.withgoogle.com/models/Mra924aIl/";
+        let model, webcam, currentPrediction = "Healthy";
+
+        async function init() {
+            model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+            webcam = new tmImage.Webcam(1280, 720, true);
+            await webcam.setup();
+            await webcam.play();
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            setTimeout(() => {
+                document.getElementById('splash').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('splash').style.display = 'none';
+                    document.getElementById('main-app').style.display = 'grid';
+                    window.requestAnimationFrame(loop);
+                }, 1200);
+            }, 4000);
+        }
+
+        async function loop() {
+            webcam.update();
+            const prediction = await model.predict(webcam.canvas);
+            let top = { name: "Healthy", prob: 0 };
+            prediction.forEach(p => { if(p.probability > top.prob) top = { name: p.className, prob: p.probability }; });
+            
+            if(top.prob > 0.4) currentPrediction = top.name;
+            window.requestAnimationFrame(loop);
+        }
+
+        init();
+    </script>
+</body>
+</html>
